@@ -36,13 +36,13 @@ body {
 .app {
   max-width: 440px;
   margin: 0 auto;
-  padding: 22px 18px 44px;
+  padding: 14px 18px 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 header { text-align: center; margin-bottom: 4px; }
-header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
+header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; }
 header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 
 /* ============================================================
@@ -51,16 +51,16 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 .stage {
   position: relative;
   width: 100%;
-  height: clamp(340px, 56vh, 420px);
+  height: clamp(380px, 54vh, 390px);
   /* 顶部留出缓冲带：硬币抛起时最高点不遮挡上方标题 */
-  margin-top: 44px;
+  margin-top: 48px;
 }
 
 /* 硬币容器：负责整体位移（抛起、弹跳） */
 .coin-scene {
   position: absolute;
   left: 50%;
-  bottom: 34px;
+  bottom: 30px;
   transform: translateX(-50%);
   z-index: 2;
   cursor: pointer;
@@ -194,7 +194,7 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
    结果区
    ============================================================ */
 .result {
-  min-height: 34px;
+  min-height: 30px;
   margin: 2px 0 10px;
   font-size: 23px;
   font-weight: 800;
@@ -218,7 +218,7 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 .flip-btn {
   width: 100%;
   max-width: 320px;
-  padding: 13px 0;
+  padding: 12px 0;
   border: none;
   border-radius: 999px;
   font-size: 18px;
@@ -258,7 +258,7 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .history-head h2 { margin: 0; }
 .clear-btn {
@@ -315,7 +315,7 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 
 .ghost-btn {
   margin-top: 4px;
-  padding: 9px 16px;
+  padding: 7px 14px;
   border: 1px solid rgba(255,255,255,.18);
   border-radius: 999px;
   background: rgba(255,255,255,.06);
@@ -636,7 +636,7 @@ footer {
 
     var coinSize = coin.getBoundingClientRect().width;
     // 抛起高度（配合舞台顶部缓冲带，硬币最高点不遮挡标题）
-    var lift = Math.max(130, Math.round(coinSize * 0.75));
+    var lift = Math.max(130, Math.round(coinSize * 0.72));
     var t0 = performance.now();
 
     // 缓动：先加速后减速，落地更自然
