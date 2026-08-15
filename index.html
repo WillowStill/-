@@ -116,18 +116,16 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 /* 正面：金色金属质感（高光点 + 金色锥形渐变） */
 .coin-front {
   transform: translateZ(var(--thick));
-  /* 全部使用平滑径向渐变，避免 conic 渐变在圆心处产生放射状的“尖” */
+  /* 平滑径向渐变（已去掉左上角高光，仅保留右下角微光 + 中心渐变） */
   background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.22) 10%, transparent 38%),
     radial-gradient(circle at 68% 74%, rgba(255,255,255,.4) 0%, transparent 42%),
     radial-gradient(circle at 50% 50%, #f7df8a 0%, #ecc95e 28%, #d4a52a 55%, #a07c1e 78%, #7a5d12 100%);
 }
 /* 反面：亮银色金属质感，与金色正面形成鲜明色差，旋转时易于分辨 */
 .coin-back {
   transform: rotateY(180deg) translateZ(var(--thick));
-  /* 同正面：纯径向渐变，无圆心“尖” */
+  /* 同正面：去掉左上角高光 */
   background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.22) 10%, transparent 38%),
     radial-gradient(circle at 68% 74%, rgba(255,255,255,.45) 0%, transparent 42%),
     radial-gradient(circle at 50% 50%, #f0f4fb 0%, #d8e1f0 28%, #b4c2dd 55%, #8fa0c4 78%, #6f7fa3 100%);
 }
