@@ -43,7 +43,7 @@ body {
 }
 header { text-align: center; margin-bottom: 4px; }
 header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
-header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
+header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 
 /* ============================================================
    舞台：硬币 + 阴影（虚线轨迹装饰已移除）
@@ -51,9 +51,9 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 .stage {
   position: relative;
   width: 100%;
-  height: clamp(320px, 56vh, 400px);
+  height: clamp(340px, 56vh, 420px);
   /* 顶部留出缓冲带：硬币抛起时最高点不遮挡上方标题 */
-  margin-top: 36px;
+  margin-top: 44px;
 }
 
 /* 硬币容器：负责整体位移（抛起、弹跳） */
@@ -194,8 +194,8 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
    结果区
    ============================================================ */
 .result {
-  min-height: 42px;
-  margin: 4px 0 12px;
+  min-height: 34px;
+  margin: 2px 0 10px;
   font-size: 23px;
   font-weight: 800;
   letter-spacing: 1px;
@@ -218,7 +218,7 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 .flip-btn {
   width: 100%;
   max-width: 320px;
-  padding: 15px 0;
+  padding: 13px 0;
   border: none;
   border-radius: 999px;
   font-size: 18px;
@@ -244,13 +244,13 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
    ============================================================ */
 .panel {
   width: 100%;
-  margin-top: 20px;
-  padding: 18px;
+  margin-top: 16px;
+  padding: 16px;
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.1);
   border-radius: 18px;
 }
-.panel h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: #b9c4e8; }
+.panel h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #b9c4e8; }
 .panel h2 .hint { font-size: 12px; color: #6f7ea8; font-weight: 400; margin-left: 6px; }
 
 /* 历史面板头部：标题 + 清空按钮 */
@@ -279,7 +279,7 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .face-tag {
   flex: 0 0 34px;
@@ -296,7 +296,7 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 .setting-row input {
   flex: 1;
   min-width: 0;
-  padding: 11px 14px;
+  padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.16);
   background: rgba(0,0,0,.25);
@@ -413,10 +413,7 @@ footer {
   line-height: 1.8;
 }
 
-/* 小屏微调 */
-@media (max-width: 380px) {
-  .stage { height: 320px; }
-}
+/* 小屏舞台高度交由 clamp 统一控制 */
 @media (prefers-reduced-motion: reduce) {
   .coin-scene.intro { animation: none; }
 }
@@ -426,7 +423,7 @@ footer {
 <div class="app">
   <header>
     <h1>🪙 抛硬币决策器</h1>
-    <p class="subtitle">把选择交给运气</p>
+    <p class="subtitle">让硬币替你决定</p>
   </header>
 
   <!-- 舞台：硬币 + 阴影 -->
@@ -638,8 +635,8 @@ footer {
     resultBox.classList.remove('show');
 
     var coinSize = coin.getBoundingClientRect().width;
-    // 抛起高度（略降，配合舞台顶部缓冲带，硬币最高点不遮挡标题）
-    var lift = Math.max(140, Math.round(coinSize * 0.85));
+    // 抛起高度（配合舞台顶部缓冲带，硬币最高点不遮挡标题）
+    var lift = Math.max(130, Math.round(coinSize * 0.75));
     var t0 = performance.now();
 
     // 缓动：先加速后减速，落地更自然
