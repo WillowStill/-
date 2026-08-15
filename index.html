@@ -278,8 +278,8 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 .setting-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 0;
 }
 .face-tag {
   flex: 0 0 34px;
@@ -296,7 +296,7 @@ header .subtitle { margin: 4px 0 0; font-size: 12px; color: #8fa0c8; }
 .setting-row input {
   flex: 1;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 10px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.16);
   background: rgba(0,0,0,.25);
@@ -450,18 +450,18 @@ footer {
   <!-- 抛硬币按钮 -->
   <button class="flip-btn" id="flipBtn">抛硬币</button>
 
-  <!-- 自定义两面文字 -->
+  <!-- 自定义两面文字（单行并排 + 恢复默认放标题行，尽量省垂直空间） -->
   <section class="panel">
-    <h2>自定义两面文字</h2>
+    <div class="history-head">
+      <h2>自定义两面文字</h2>
+      <button class="ghost-btn" id="restoreBtn">↺ 恢复默认</button>
+    </div>
     <div class="setting-row">
       <span class="face-tag tag-front">正</span>
-      <input id="frontInput" maxlength="8" placeholder="正面（如：去）" autocomplete="off">
-    </div>
-    <div class="setting-row">
+      <input id="frontInput" maxlength="8" placeholder="如：去" autocomplete="off" aria-label="正面文字">
       <span class="face-tag tag-back">反</span>
-      <input id="backInput" maxlength="8" placeholder="反面（如：不去）" autocomplete="off">
+      <input id="backInput" maxlength="8" placeholder="如：不去" autocomplete="off" aria-label="反面文字">
     </div>
-    <button class="ghost-btn" id="restoreBtn">↺ 恢复默认文字</button>
   </section>
 
   <!-- 历史记录 -->
