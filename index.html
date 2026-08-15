@@ -46,30 +46,15 @@ header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
 header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 
 /* ============================================================
-   舞台：硬币 + 阴影 + 轨迹弧线
+   舞台：硬币 + 阴影（虚线轨迹装饰已移除）
    ============================================================ */
 .stage {
   position: relative;
   width: 100%;
-  height: clamp(300px, 52vh, 380px);
-  margin-top: 6px;
+  height: clamp(320px, 56vh, 400px);
+  /* 顶部留出缓冲带：硬币抛起时最高点不遮挡上方标题 */
+  margin-top: 36px;
 }
-/* 抛起时的虚线轨迹圆环（视觉速度感辅助） */
-.trail {
-  position: absolute;
-  left: 50%;
-  top: 4%;
-  width: 250px;
-  height: 250px;
-  transform: translateX(-50%);
-  border: 3px dashed rgba(255, 215, 130, 0.35);
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .25s ease;
-}
-.trail.show { opacity: 1; animation: trailSpin 1.1s linear infinite; }
-@keyframes trailSpin { to { transform: translateX(-50%) rotate(360deg); } }
 
 /* 硬币容器：负责整体位移（抛起、弹跳） */
 .coin-scene {
@@ -430,8 +415,7 @@ footer {
 
 /* 小屏微调 */
 @media (max-width: 380px) {
-  .trail { width: 190px; height: 190px; }
-  .stage { height: 300px; }
+  .stage { height: 320px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .coin-scene.intro { animation: none; }
@@ -445,9 +429,8 @@ footer {
     <p class="subtitle">把选择交给运气</p>
   </header>
 
-  <!-- 舞台：硬币 + 轨迹 + 阴影 -->
+  <!-- 舞台：硬币 + 阴影 -->
   <section class="stage" aria-label="抛硬币舞台">
-    <div class="trail" id="trail"></div>
     <div class="coin-scene intro" id="coinScene">
       <div class="coin" id="coin">
         <div class="coin-face coin-front">
@@ -520,7 +503,7 @@ footer {
   var STATS_KEY = 'cfd_stats_v1';
 
   /* DOM 引用与运行状态 */
-  var coin, coinScene, shadowEl, trailEl, frontTextEl, backTextEl, frontFace, backFace;
+  var coin, coinScene, shadowEl, frontTextEl, backTextEl, frontFace, backFace;
   var frontInput, backInput, restoreBtn, flipBtn, resultBox, resultTextEl, historyList, statsBox, clearAllBtn;
   var frontText = DEFAULTS.front;
   var backText = DEFAULTS.back;
@@ -554,7 +537,6 @@ footer {
     coin = document.getElementById('coin');
     coinScene = document.getElementById('coinScene');
     shadowEl = document.getElementById('shadow');
-    trailEl = document.getElementById('trail');
     frontTextEl = document.getElementById('frontText');
     backTextEl = document.getElementById('backText');
     frontFace = coin.querySelector('.coin-front');
@@ -654,10 +636,10 @@ footer {
     backInput.disabled = true;
     restoreBtn.disabled = true;
     resultBox.classList.remove('show');
-    trailEl.classList.add('show');
 
     var coinSize = coin.getBoundingClientRect().width;
-    var lift = Math.max(170, Math.round(coinSize * 1.02)); // 抛起高度
+    // 抛起高度（略降，配合舞台顶部缓冲带，硬币最高点不遮挡标题）
+    var lift = Math.max(140, Math.round(coinSize * 0.85));
     var t0 = performance.now();
 
     // 缓动：先加速后减速，落地更自然
@@ -710,7 +692,6 @@ footer {
     coin.style.transform = 'rotateY(' + desiredMod + 'deg)';
     frontFace.style.filter = '';
     backFace.style.filter = '';
-    trailEl.classList.remove('show');
 
     // 落地音效（Web Audio 合成金属撞击声）
     playLandSound();
