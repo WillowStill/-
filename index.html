@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101828">
+<!-- 禁止缓存：避免微信等内置浏览器继续使用旧版页面（代码更新后需重新上传到 GitHub） -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>抛硬币决策器</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪙%3C/text%3E%3C/svg%3E">
 <style>
@@ -127,18 +131,20 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 /* 正面：金色金属质感（高光点 + 金色锥形渐变） */
 .coin-front {
   transform: translateZ(var(--thick));
+  /* 全部使用平滑径向渐变，避免 conic 渐变在圆心处产生放射状的“尖” */
   background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.25) 12%, transparent 40%),
-    radial-gradient(circle at 70% 74%, rgba(255,255,255,.35) 0%, transparent 45%),
-    conic-gradient(from 200deg, #8a6a1e, #e7c766 25%, #fff3c4 50%, #c99e2e 72%, #8a6a1e);
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.22) 10%, transparent 38%),
+    radial-gradient(circle at 68% 74%, rgba(255,255,255,.4) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, #f7df8a 0%, #ecc95e 28%, #d4a52a 55%, #a07c1e 78%, #7a5d12 100%);
 }
 /* 反面：亮银色金属质感，与金色正面形成鲜明色差，旋转时易于分辨 */
 .coin-back {
   transform: rotateY(180deg) translateZ(var(--thick));
+  /* 同正面：纯径向渐变，无圆心“尖” */
   background:
-    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.25) 12%, transparent 40%),
-    radial-gradient(circle at 70% 74%, rgba(255,255,255,.4) 0%, transparent 45%),
-    conic-gradient(from 200deg, #93a6c9, #d6e0f2 25%, #f7faff 50%, #aebddb 72%, #93a6c9);
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.22) 10%, transparent 38%),
+    radial-gradient(circle at 68% 74%, rgba(255,255,255,.45) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, #f0f4fb 0%, #d8e1f0 28%, #b4c2dd 55%, #8fa0c4 78%, #6f7fa3 100%);
 }
 /* 硬币边缘：比两面略大一圈，旋转时产生滚花/厚度视觉 */
 .coin-edge {
@@ -318,6 +324,9 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
   box-shadow: 0 0 0 3px rgba(245,197,66,.15);
 }
 .setting-row input::placeholder { color: #5d6b90; }
+/* 抛掷动画期间禁用输入（防止币面文字与结果显示不一致） */
+.setting-row input:disabled { opacity: .45; }
+.ghost-btn:disabled { opacity: .4; cursor: default; }
 
 .ghost-btn {
   margin-top: 4px;
@@ -635,9 +644,15 @@ footer {
     var spins = MIN_SPINS + Math.floor(Math.random() * (MAX_SPINS - MIN_SPINS + 1)); // 3、4 或 5 圈
     var totalDelta = spins * 360 + delta;
 
-    // UI：禁用按钮与硬币点击、隐藏旧结果、显示轨迹
+    // UI：禁用按钮、硬币点击与文字输入（防止动画中修改正反面文字
+    // 导致“币面文字与结果显示不一致”）；隐藏旧结果、显示轨迹
     flipBtn.disabled = true;
     coinScene.style.pointerEvents = 'none';
+    if (document.activeElement === frontInput) frontInput.blur();
+    if (document.activeElement === backInput) backInput.blur();
+    frontInput.disabled = true;
+    backInput.disabled = true;
+    restoreBtn.disabled = true;
     resultBox.classList.remove('show');
     trailEl.classList.add('show');
 
@@ -720,9 +735,12 @@ footer {
     // 写入历史
     addHistory(isFront ? 'front' : 'back', resultText);
 
-    // 恢复交互
+    // 恢复交互（含文字输入）
     flipBtn.disabled = false;
     coinScene.style.pointerEvents = '';
+    frontInput.disabled = false;
+    backInput.disabled = false;
+    restoreBtn.disabled = false;
   }
 
   /* ============================================================
