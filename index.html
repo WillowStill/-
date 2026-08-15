@@ -262,6 +262,28 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 .panel h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: #b9c4e8; }
 .panel h2 .hint { font-size: 12px; color: #6f7ea8; font-weight: 400; margin-left: 6px; }
 
+/* 历史面板头部：标题 + 清空按钮 */
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.history-head h2 { margin: 0; }
+.clear-btn {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 120, 120, .35);
+  border-radius: 999px;
+  background: rgba(255, 80, 80, .12);
+  color: #ff9d9d;
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .15s ease, color .15s ease, transform .1s ease;
+}
+.clear-btn:active { transform: scale(.95); }
+.clear-btn.confirming { background: rgba(255, 80, 80, .4); color: #fff; }
+
 .setting-row {
   display: flex;
   align-items: center;
@@ -370,6 +392,24 @@ header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
 .badge-back  { background: linear-gradient(135deg, #7d8cff, #5a66d9); color: #fff; }
 .history-item .htext { flex: 1; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-item .htime { font-size: 12px; color: #8fa0c8; flex: 0 0 auto; }
+.history-item .del-btn {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .1);
+  color: #9aa8cc;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, color .15s ease;
+}
+.history-item .del-btn:active { background: rgba(255, 80, 80, .4); color: #fff; }
 
 footer {
   margin-top: 22px;
@@ -437,7 +477,10 @@ footer {
 
   <!-- 历史记录 -->
   <section class="panel">
-    <h2>历史记录<span class="hint">最近 10 次</span></h2>
+    <div class="history-head">
+      <h2>历史记录<span class="hint">最近 10 次</span></h2>
+      <button class="clear-btn" id="clearAllBtn" type="button">清空记录</button>
+    </div>
     <div class="stats" id="statsBox"></div>
     <ul class="history-list" id="historyList"></ul>
   </section>
@@ -469,7 +512,7 @@ footer {
 
   /* DOM 引用与运行状态 */
   var coin, coinScene, shadowEl, trailEl, frontTextEl, backTextEl, frontFace, backFace;
-  var frontInput, backInput, restoreBtn, flipBtn, resultBox, resultTextEl, historyList, statsBox;
+  var frontInput, backInput, restoreBtn, flipBtn, resultBox, resultTextEl, historyList, statsBox, clearAllBtn;
   var frontText = DEFAULTS.front;
   var backText = DEFAULTS.back;
   var currentAngle = -22;  // 当前绕 Y 轴角度（初始微侧，展示立体感）
@@ -515,6 +558,7 @@ footer {
     resultTextEl = document.getElementById('resultText');
     historyList = document.getElementById('historyList');
     statsBox = document.getElementById('statsBox');
+    clearAllBtn = document.getElementById('clearAllBtn');
   }
 
   /* ============================================================
@@ -775,7 +819,12 @@ footer {
     if (!raw) return [];
     try {
       var arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.slice(0, HISTORY_LIMIT) : [];
+      if (!Array.isArray(arr)) return [];
+      // 兼容旧数据：为没有 id 的记录补一个稳定 id（用于单条删除定位）
+      for (var i = 0; i < arr.length; i++) {
+        if (!arr[i].id) arr[i].id = 'h' + arr[i].t + '-' + i;
+      }
+      return arr.slice(0, HISTORY_LIMIT);
     } catch (e) {
       return [];
     }
@@ -783,7 +832,7 @@ footer {
 
   function addHistory(face, text) {
     var list = loadHistory();
-    list.unshift({ face: face, text: text, t: Date.now() });
+    list.unshift({ id: 'h' + Date.now() + '-' + Math.floor(Math.random() * 1000), face: face, text: text, t: Date.now() });
     list = list.slice(0, HISTORY_LIMIT);
     safeSet(HISTORY_KEY, JSON.stringify(list));
     renderHistory(list);
@@ -816,9 +865,20 @@ footer {
       time.className = 'htime';
       time.textContent = formatTime(it.t);
 
+      var del = document.createElement('button');
+      del.className = 'del-btn';
+      del.type = 'button';
+      del.textContent = '×';
+      del.setAttribute('aria-label', '删除这条记录');
+      // 闭包保存本条记录的 id，点击时删除对应条目
+      del.addEventListener('click', (function (id) {
+        return function () { removeHistoryItem(id); };
+      })(it.id));
+
       li.appendChild(badge);
       li.appendChild(txt);
       li.appendChild(time);
+      li.appendChild(del);
       historyList.appendChild(li);
     }
   }
@@ -903,6 +963,54 @@ footer {
   }
 
   /* ============================================================
+     历史记录：单条删除 / 全部清空
+     ============================================================ */
+  function removeHistoryItem(id) {
+    var list = loadHistory();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    var item = list[idx];
+    list.splice(idx, 1);
+    safeSet(HISTORY_KEY, JSON.stringify(list));
+    // 同步更新统计（删掉一条 = 少一次抛掷）
+    var s = loadStats();
+    if (s.total > 0) s.total--;
+    if (item.face === 'front') s.front = Math.max(0, s.front - 1);
+    else s.back = Math.max(0, s.back - 1);
+    safeSet(STATS_KEY, JSON.stringify(s));
+    renderHistory(list);
+    renderStats(s);
+  }
+
+  function clearAllHistory() {
+    safeSet(HISTORY_KEY, JSON.stringify([]));
+    safeSet(STATS_KEY, JSON.stringify({ total: 0, front: 0, back: 0 }));
+    renderHistory([]);
+    renderStats({ total: 0, front: 0, back: 0 });
+  }
+
+  var clearTimer = null;
+  function onClearAllClick() {
+    // 第一次点击进入确认态，3 秒内再点才真正清空（防止误触）
+    if (!clearAllBtn.classList.contains('confirming')) {
+      clearAllBtn.classList.add('confirming');
+      clearAllBtn.textContent = '确认清空？';
+      clearTimer = setTimeout(function () {
+        clearAllBtn.classList.remove('confirming');
+        clearAllBtn.textContent = '清空记录';
+      }, 3000);
+      return;
+    }
+    if (clearTimer) clearTimeout(clearTimer);
+    clearAllBtn.classList.remove('confirming');
+    clearAllBtn.textContent = '清空记录';
+    clearAllHistory();
+  }
+
+  /* ============================================================
      事件绑定
      ============================================================ */
   function bindEvents() {
@@ -926,6 +1034,7 @@ footer {
       saveTexts();
     });
     restoreBtn.addEventListener('click', restoreDefaults);
+    clearAllBtn.addEventListener('click', onClearAllClick);
   }
 })();
 </script>
