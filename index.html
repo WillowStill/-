@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101828">
+<title>抛硬币决策器</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪙%3C/text%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   基础样式：移动端优先、居中布局、深色氛围背景
+   ============================================================ */
+:root {
+  --coin: clamp(170px, 58vw, 230px); /* 硬币尺寸，随屏幕自适应 */
+  --thick: 7px;                      /* 硬币厚度（前后两面的 z 间距） */
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  color: #eef2ff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(1100px 560px at 50% -10%, #2b3a55 0%, transparent 60%),
+    radial-gradient(800px 460px at 88% 112%, #3a2e4a 0%, transparent 55%),
+    linear-gradient(160deg, #101828 0%, #16213e 55%, #1a1a2e 100%);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+.app {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 22px 18px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+header { text-align: center; margin-bottom: 4px; }
+header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
+header .subtitle { margin: 6px 0 0; font-size: 13px; color: #8fa0c8; }
+
+/* ============================================================
+   舞台：硬币 + 阴影 + 轨迹弧线
+   ============================================================ */
+.stage {
+  position: relative;
+  width: 100%;
+  height: clamp(300px, 52vh, 380px);
+  margin-top: 6px;
+}
+/* 抛起时的虚线轨迹圆环（视觉速度感辅助） */
+.trail {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  width: 250px;
+  height: 250px;
+  transform: translateX(-50%);
+  border: 3px dashed rgba(255, 215, 130, 0.35);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.trail.show { opacity: 1; animation: trailSpin 1.1s linear infinite; }
+@keyframes trailSpin { to { transform: translateX(-50%) rotate(360deg); } }
+
+/* 硬币容器：负责整体位移（抛起、弹跳） */
+.coin-scene {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  z-index: 2;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .18s ease;
+  /* 为子元素 .coin 建立透视投影，旋转时呈现近大远小的真实 3D 感 */
+  perspective: 900px;
+}
+/* 入场动画（仅首次加载），结束后移除 class 以免覆盖后续 transform */
+.coin-scene.intro { animation: sceneIn .65s cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes sceneIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(28px) scale(.78); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+/* 桌面端悬停微交互 */
+@media (hover: hover) {
+  .coin-scene:hover { transform: translateX(-50%) translateY(-5px) scale(1.02); }
+}
+/* 落地弹跳：translateX(-50%) 必须写进关键帧，避免覆盖横向定位 */
+.coin-scene.landed { animation: coinBounce .55s cubic-bezier(.36, .07, .19, .97); }
+@keyframes coinBounce {
+  0%   { transform: translateX(-50%) translateY(0); }
+  20%  { transform: translateX(-50%) translateY(-16px); }
+  42%  { transform: translateX(-50%) translateY(0) scaleY(.97); }
+  63%  { transform: translateX(-50%) translateY(-7px); }
+  80%  { transform: translateX(-50%) translateY(0); }
+  92%  { transform: translateX(-50%) translateY(-2px); }
+  100% { transform: translateX(-50%) translateY(0); }
+}
+
+/* 硬币本体：CSS 3D 立体（前后两面 + 边缘） */
+.coin {
+  position: relative;
+  width: var(--coin);
+  height: var(--coin);
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  will-change: transform;
+  border-radius: 50%;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38); /* 硬币自身的投影 */
+}
+.coin-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+/* 正面：金色金属质感（高光点 + 金色锥形渐变） */
+.coin-front {
+  transform: translateZ(var(--thick));
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.25) 12%, transparent 40%),
+    radial-gradient(circle at 70% 74%, rgba(255,255,255,.35) 0%, transparent 45%),
+    conic-gradient(from 200deg, #8a6a1e, #e7c766 25%, #fff3c4 50%, #c99e2e 72%, #8a6a1e);
+}
+/* 反面：亮银色金属质感，与金色正面形成鲜明色差，旋转时易于分辨 */
+.coin-back {
+  transform: rotateY(180deg) translateZ(var(--thick));
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.25) 12%, transparent 40%),
+    radial-gradient(circle at 70% 74%, rgba(255,255,255,.4) 0%, transparent 45%),
+    conic-gradient(from 200deg, #93a6c9, #d6e0f2 25%, #f7faff 50%, #aebddb 72%, #93a6c9);
+}
+/* 硬币边缘：比两面略大一圈，旋转时产生滚花/厚度视觉 */
+.coin-edge {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  transform: translateZ(0);
+  background: conic-gradient(from 0deg,
+    #5c4a12, #d9b64a 12%, #fff3c4 24%, #8a6a1e 38%,
+    #d9b64a 50%, #5c4a12 62%, #e7c766 76%, #fff3c4 88%, #5c4a12);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.25);
+}
+/* 币面内压印环纹 */
+.coin-inner {
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.22);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), inset 0 2px 6px rgba(0,0,0,.18);
+}
+.coin-text {
+  position: relative;
+  z-index: 2;
+  max-width: 74%;
+  text-align: center;
+  line-height: 1.25;
+  word-break: break-all;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #4a3400;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+.coin-back .coin-text { color: #2c3a66; }
+
+/* 地面阴影：随抛起高度缩小变淡 */
+.shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  width: 64%;
+  height: 26px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,.55) 0%, rgba(0,0,0,.28) 45%, transparent 70%);
+  filter: blur(2px);
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.shadow.shadow-landed { animation: shadowBounce .55s cubic-bezier(.36,.07,.19,.97); }
+@keyframes shadowBounce {
+  0%   { transform: translateX(-50%) scale(1); opacity: .9; }
+  20%  { transform: translateX(-50%) scale(.8); opacity: .5; }
+  42%  { transform: translateX(-50%) scale(1); opacity: .95; }
+  63%  { transform: translateX(-50%) scale(.9); opacity: .75; }
+  80%  { transform: translateX(-50%) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+/* ============================================================
+   结果区
+   ============================================================ */
+.result {
+  min-height: 42px;
+  margin: 4px 0 12px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-align: center;
+  color: #ffe9a3;
+  text-shadow: 0 0 18px rgba(245, 197, 66, .45);
+  opacity: 0;
+  transform: scale(.8);
+}
+/* 结果出现：放大 + 高亮动效 */
+.result.show { animation: pop .5s cubic-bezier(.2, 1.5, .4, 1) forwards; }
+@keyframes pop {
+  0%   { opacity: 0; transform: scale(.7) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================================================
+   按钮
+   ============================================================ */
+.flip-btn {
+  width: 100%;
+  max-width: 320px;
+  padding: 15px 0;
+  border: none;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-indent: 4px;
+  color: #3b2a05;
+  background: linear-gradient(135deg, #ffe9a3, #f5c542 45%, #e0a51f);
+  box-shadow: 0 8px 24px rgba(245,197,66,.28), inset 0 1px 0 rgba(255,255,255,.6);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .12s ease, box-shadow .12s ease, opacity .2s;
+}
+.flip-btn:active:not(:disabled) {
+  transform: translateY(2px) scale(.98);
+  box-shadow: 0 4px 12px rgba(245,197,66,.22), inset 0 1px 0 rgba(255,255,255,.6);
+}
+/* 动画期间禁用 */
+.flip-btn:disabled { opacity: .55; cursor: default; }
+
+/* ============================================================
+   面板（设置 / 历史）
+   ============================================================ */
+.panel {
+  width: 100%;
+  margin-top: 20px;
+  padding: 18px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 18px;
+}
+.panel h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; color: #b9c4e8; }
+.panel h2 .hint { font-size: 12px; color: #6f7ea8; font-weight: 400; margin-left: 6px; }
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.face-tag {
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.tag-front { background: linear-gradient(135deg, #f5c542, #d99a1b); color: #4a3400; }
+.tag-back  { background: linear-gradient(135deg, #7d8cff, #5a66d9); color: #fff; }
+.setting-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.25);
+  color: #fff;
+  font-size: 16px; /* ≥16px 防止 iOS 聚焦时自动放大 */
+  outline: none;
+}
+.setting-row input:focus {
+  border-color: rgba(245,197,66,.6);
+  box-shadow: 0 0 0 3px rgba(245,197,66,.15);
+}
+.setting-row input::placeholder { color: #5d6b90; }
+
+.ghost-btn {
+  margin-top: 4px;
+  padding: 9px 16px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
+  color: #c3cfe8;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .15s ease, color .15s ease;
+}
+.ghost-btn:active { background: rgba(255,255,255,.14); color: #fff; }
+
+/* 正反统计：展示长期比例，帮助观察趋近 50% */
+.stats {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .22);
+}
+.stats-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #c3cfe8;
+  margin-bottom: 8px;
+}
+.stats-line .cnt { font-weight: 700; }
+.stats-line .cnt-front { color: #f5c542; }
+.stats-line .cnt-back { color: #8ea0ff; }
+.stats-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .08);
+}
+.stats-fill { transition: width .5s ease; }
+.fill-front { background: linear-gradient(90deg, #f5c542, #d99a1b); }
+.fill-back  { background: linear-gradient(90deg, #7d8cff, #5a66d9); }
+
+.history-list { list-style: none; margin: 0; padding: 0; }
+.history-empty { padding: 14px 0; text-align: center; font-size: 13px; color: #6f7ea8; }
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  animation: slideIn .3s ease-out;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.history-item .badge {
+  flex: 0 0 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge-front { background: linear-gradient(135deg, #f5c542, #d99a1b); color: #4a3400; }
+.badge-back  { background: linear-gradient(135deg, #7d8cff, #5a66d9); color: #fff; }
+.history-item .htext { flex: 1; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-item .htime { font-size: 12px; color: #8fa0c8; flex: 0 0 auto; }
+
+footer {
+  margin-top: 22px;
+  font-size: 12px;
+  color: #5d6b90;
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* 小屏微调 */
+@media (max-width: 380px) {
+  .trail { width: 190px; height: 190px; }
+  .stage { height: 300px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coin-scene.intro { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🪙 抛硬币决策器</h1>
+    <p class="subtitle">把选择交给运气</p>
+  </header>
+
+  <!-- 舞台：硬币 + 轨迹 + 阴影 -->
+  <section class="stage" aria-label="抛硬币舞台">
+    <div class="trail" id="trail"></div>
+    <div class="coin-scene intro" id="coinScene">
+      <div class="coin" id="coin">
+        <div class="coin-face coin-front">
+          <div class="coin-inner"></div>
+          <div class="coin-text" id="frontText">正面</div>
+        </div>
+        <div class="coin-face coin-back">
+          <div class="coin-inner"></div>
+          <div class="coin-text" id="backText">反面</div>
+        </div>
+        <div class="coin-edge"></div>
+      </div>
+    </div>
+    <div class="shadow" id="shadow"></div>
+  </section>
+
+  <!-- 结果 -->
+  <div class="result" id="resultBox" aria-live="polite"><span id="resultText"></span></div>
+
+  <!-- 抛硬币按钮 -->
+  <button class="flip-btn" id="flipBtn">抛硬币</button>
+
+  <!-- 自定义两面文字 -->
+  <section class="panel">
+    <h2>自定义两面文字</h2>
+    <div class="setting-row">
+      <span class="face-tag tag-front">正</span>
+      <input id="frontInput" maxlength="8" placeholder="正面（如：去）" autocomplete="off">
+    </div>
+    <div class="setting-row">
+      <span class="face-tag tag-back">反</span>
+      <input id="backInput" maxlength="8" placeholder="反面（如：不去）" autocomplete="off">
+    </div>
+    <button class="ghost-btn" id="restoreBtn">↺ 恢复默认文字</button>
+  </section>
+
+  <!-- 历史记录 -->
+  <section class="panel">
+    <h2>历史记录<span class="hint">最近 10 次</span></h2>
+    <div class="stats" id="statsBox"></div>
+    <ul class="history-list" id="historyList"></ul>
+  </section>
+
+  <footer>点击硬币或「抛硬币」按钮开始 · 结果完全随机（正反各 50%），连出同面属正常随机现象 · 仅供参考</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     配置区（可自定义）
+     - FLIP_DURATION：抛掷动画总时长(ms)，建议 1500 ~ 2500
+     - MIN_SPINS / MAX_SPINS：绕 Y 轴旋转圈数范围（要求 3~5 圈）
+     - DEFAULTS：正反面默认文字，修改这里即可替换默认值
+     ============================================================ */
+  var FLIP_DURATION = 2000;   // 动画时长 2 秒
+  var MIN_SPINS = 3;
+  var MAX_SPINS = 5;
+  var HISTORY_LIMIT = 10;
+  var DEFAULTS = { front: '正面', back: '反面' };
+
+  /* localStorage 键名 */
+  var FRONT_KEY = 'cfd_front_v1';
+  var BACK_KEY = 'cfd_back_v1';
+  var HISTORY_KEY = 'cfd_history_v1';
+  var STATS_KEY = 'cfd_stats_v1';
+
+  /* DOM 引用与运行状态 */
+  var coin, coinScene, shadowEl, trailEl, frontTextEl, backTextEl, frontFace, backFace;
+  var frontInput, backInput, restoreBtn, flipBtn, resultBox, resultTextEl, historyList, statsBox;
+  var frontText = DEFAULTS.front;
+  var backText = DEFAULTS.back;
+  var currentAngle = -22;  // 当前绕 Y 轴角度（初始微侧，展示立体感）
+  var flipping = false;    // 是否正在抛掷（防止重复触发）
+  var rafId = null;
+  var audioCtx = null;     // Web Audio 上下文（移动端需手势解锁）
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  /* ============================================================
+     初始化
+     ============================================================ */
+  function init() {
+    cacheDom();
+    loadSavedTexts();
+    applyTexts();
+    renderHistory(loadHistory());
+    renderStats(loadStats());
+    bindEvents();
+    // 入场动画结束移除 class，避免 fill-mode 干扰后续 JS transform
+    coinScene.addEventListener('animationend', function (e) {
+      if (e.animationName === 'sceneIn') coinScene.classList.remove('intro');
+    });
+    window.addEventListener('resize', fitCoinText);
+    // 初始姿态：微侧展示厚度与双面
+    coin.style.transform = 'rotateY(' + currentAngle + 'deg)';
+  }
+
+  function cacheDom() {
+    coin = document.getElementById('coin');
+    coinScene = document.getElementById('coinScene');
+    shadowEl = document.getElementById('shadow');
+    trailEl = document.getElementById('trail');
+    frontTextEl = document.getElementById('frontText');
+    backTextEl = document.getElementById('backText');
+    frontFace = coin.querySelector('.coin-front');
+    backFace = coin.querySelector('.coin-back');
+    frontInput = document.getElementById('frontInput');
+    backInput = document.getElementById('backInput');
+    restoreBtn = document.getElementById('restoreBtn');
+    flipBtn = document.getElementById('flipBtn');
+    resultBox = document.getElementById('resultBox');
+    resultTextEl = document.getElementById('resultText');
+    historyList = document.getElementById('historyList');
+    statsBox = document.getElementById('statsBox');
+  }
+
+  /* ============================================================
+     文字自定义 + localStorage 持久化
+     ============================================================ */
+  function loadSavedTexts() {
+    var f = safeGet(FRONT_KEY);
+    var b = safeGet(BACK_KEY);
+    if (f) { frontText = f; frontInput.value = f; }
+    if (b) { backText = b; backInput.value = b; }
+  }
+
+  function saveTexts() {
+    var f = frontInput.value.trim();
+    var b = backInput.value.trim();
+    if (f) safeSet(FRONT_KEY, f); else safeRemove(FRONT_KEY);
+    if (b) safeSet(BACK_KEY, b); else safeRemove(BACK_KEY);
+  }
+
+  function applyTexts() {
+    // 用 textContent 写入，避免注入 HTML
+    frontTextEl.textContent = frontText;
+    backTextEl.textContent = backText;
+    fitCoinText();
+  }
+
+  function restoreDefaults() {
+    frontInput.value = DEFAULTS.front;
+    backInput.value = DEFAULTS.back;
+    frontText = DEFAULTS.front;
+    backText = DEFAULTS.back;
+    applyTexts();
+    safeRemove(FRONT_KEY);
+    safeRemove(BACK_KEY);
+  }
+
+  /* 根据文字长度自适应币面字号（中文约等宽，按字符数估算） */
+  function fitCoinText() {
+    var size = coin.getBoundingClientRect().width;
+    var len = Math.max(frontText.length, backText.length, 1);
+    var avail = size * 0.78;
+    var fs = Math.max(15, Math.min(46, Math.floor(avail / (len * 0.62))));
+    frontTextEl.style.fontSize = fs + 'px';
+    backTextEl.style.fontSize = fs + 'px';
+  }
+
+  /* localStorage 安全读写（隐私模式可能抛异常） */
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function safeRemove(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  /* ============================================================
+     抛掷动画：抛物线 + 绕 Y 轴多圈旋转 + 阴影联动
+     采用 requestAnimationFrame 逐帧驱动，时长 2s，
+     位置为抛物线 h(p)=4·L·p·(1-p)，角度累计 3~5 圈后停在目标面。
+     ============================================================ */
+  function startFlip() {
+    if (flipping) return;
+    flipping = true;
+    ensureAudioCtx(); // 点击即解锁/预热音频上下文
+
+    // 随机结果：正反各约 50%
+    var isFront = Math.random() < 0.5;
+    var resultText = isFront ? frontText : backText;
+
+    // 目标角度：正面停 0°，反面停 180°（mod 360）
+    var currentMod = ((currentAngle % 360) + 360) % 360;
+    var desiredMod = isFront ? 0 : 180;
+    var delta = (desiredMod - currentMod + 360) % 360;
+    if (delta < 90) delta += 360; // 保证收尾至少再转一段，不会“刚好不动”
+    // 旋转圈数必须是整数：若为小数，spins*360 不是 360 的整数倍，
+    // 最终角度会偏离目标面（如停在 252° 这类“侧面偏斜”角度），
+    // 导致落地姿态与显示结果不一致。3~5 圈随机取整。
+    var spins = MIN_SPINS + Math.floor(Math.random() * (MAX_SPINS - MIN_SPINS + 1)); // 3、4 或 5 圈
+    var totalDelta = spins * 360 + delta;
+
+    // UI：禁用按钮与硬币点击、隐藏旧结果、显示轨迹
+    flipBtn.disabled = true;
+    coinScene.style.pointerEvents = 'none';
+    resultBox.classList.remove('show');
+    trailEl.classList.add('show');
+
+    var coinSize = coin.getBoundingClientRect().width;
+    var lift = Math.max(170, Math.round(coinSize * 1.02)); // 抛起高度
+    var t0 = performance.now();
+
+    // 缓动：先加速后减速，落地更自然
+    function easeInOut(p) {
+      return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    }
+
+    function frame(now) {
+      var p = Math.min(1, (now - t0) / FLIP_DURATION);
+      // 旋转在动画前 85% 时间内完成（高速旋转 → 逐渐减速 → 到位），
+      // 最后 15% 保持最终面正对用户、不倾斜，缓缓下落落地，
+      // 避免出现“即将停止时还停在侧面、最后一刻才翻到结果面”的观感。
+      var SETTLE = 0.85;
+      var ep = Math.min(1, p / SETTLE);
+      var e = easeInOut(ep);
+      // 抛物线高度：0 → lift → 0（上下弧线运动）
+      var h = lift * 4 * p * (1 - p);
+      // 空中绕 X 轴前倾再回正；旋转到位（ep=1）后保持正对用户、不再倾斜
+      var tiltX = -30 * Math.sin(Math.PI * ep);
+      // 运动模糊：旋转阶段轻微模糊，旋转停止后尽快清晰（0.8~0.9 渐隐）。
+      // 注意：给 .coin 加 filter 会使其 preserve-3d 失效（3D 被拍平、
+      // 背面被 backface-visibility 隐藏），导致旋转时永远只看到金色正面；
+      // 因此模糊必须分别加在两个币面上，以保留正反面的 3D 立体与色差。
+      var blur = Math.max(0, p < 0.8 ? 1.6 : 1.6 * (1 - (p - 0.8) / 0.1));
+      var blurStyle = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : '';
+      frontFace.style.filter = blurStyle;
+      backFace.style.filter = blurStyle;
+      coin.style.transform =
+        'translateY(' + (-h) + 'px)' +
+        ' rotateX(' + tiltX + 'deg)' +
+        ' rotateY(' + (currentAngle + totalDelta * e) + 'deg)';
+
+      // 阴影：高度越高越小越淡
+      var s = 1 - 0.45 * Math.sin(Math.PI * p);
+      shadowEl.style.transform = 'translateX(-50%) scale(' + s.toFixed(3) + ')';
+      shadowEl.style.opacity = String(1 - 0.55 * Math.sin(Math.PI * p));
+
+      if (p < 1) {
+        rafId = requestAnimationFrame(frame);
+      } else {
+        finishFlip(isFront, resultText, desiredMod);
+      }
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function finishFlip(isFront, resultText, desiredMod) {
+    flipping = false;
+    currentAngle = desiredMod;
+    coin.style.transform = 'rotateY(' + desiredMod + 'deg)';
+    frontFace.style.filter = '';
+    backFace.style.filter = '';
+    trailEl.classList.remove('show');
+
+    // 落地音效（Web Audio 合成金属撞击声）
+    playLandSound();
+
+    // 落地弹跳：重新触发 CSS 动画（先移除再强制 reflow）
+    coinScene.classList.remove('landed');
+    shadowEl.classList.remove('shadow-landed');
+    void coinScene.offsetWidth;
+    coinScene.classList.add('landed');
+    shadowEl.classList.add('shadow-landed');
+    setTimeout(function () {
+      coinScene.classList.remove('landed');
+      shadowEl.classList.remove('shadow-landed');
+    }, 600);
+
+    // 结果高亮：重新播放 pop 动画
+    resultTextEl.textContent = '结果：' + resultText;
+    resultBox.classList.remove('show');
+    void resultBox.offsetWidth;
+    resultBox.classList.add('show');
+
+    // 写入历史
+    addHistory(isFront ? 'front' : 'back', resultText);
+
+    // 恢复交互
+    flipBtn.disabled = false;
+    coinScene.style.pointerEvents = '';
+  }
+
+  /* ============================================================
+     音效：Web Audio 合成“金属硬币落地”声
+     - 多个非整数倍高频正弦泛音叠加 → 清脆金属“叮”
+     - 短噪声瞬态 → 碰撞的“啪”感
+     - 快速指数衰减包络 → 短促
+     - Delay + Feedback 反馈回路 → 轻微回响
+     不依赖任何外部音频文件。
+     ============================================================ */
+  function ensureAudioCtx() {
+    var AC = window.AudioContext || window.webkitAudioContext; // 兼容旧版 webkit
+    if (!AC) return null;
+    if (!audioCtx) audioCtx = new AC();
+    // 移动端/微信：AudioContext 初始为 suspended，需在用户手势中 resume
+    if (audioCtx.state === 'suspended' && audioCtx.resume) {
+      audioCtx.resume().catch(function () {});
+    }
+    return audioCtx;
+  }
+
+  function playLandSound() {
+    var ctx = ensureAudioCtx();
+    if (!ctx || ctx.state !== 'running') return; // 未解锁则静默跳过
+
+    var t = ctx.currentTime;
+
+    // 总输出总线
+    var master = ctx.createGain();
+    master.gain.value = 0.55;
+    master.connect(ctx.destination);
+
+    // 快速衰减包络（约 0.3s 内衰减到近零）
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(1, t + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.30);
+
+    // 金属泛音：基频 + 非整数倍泛音（模拟硬币的模态振动）
+    var partials = [
+      { f: 2430, g: 1.0  },
+      { f: 3620, g: 0.55 },
+      { f: 4890, g: 0.32 },
+      { f: 1180, g: 0.35 },
+      { f: 6100, g: 0.18 }
+    ];
+    for (var i = 0; i < partials.length; i++) {
+      var osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = partials[i].f;
+      var g = ctx.createGain();
+      g.gain.value = partials[i].g;
+      osc.connect(g);
+      g.connect(env);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    }
+
+    // 短噪声瞬态（碰撞拍击感）
+    var noiseDur = 0.018;
+    var buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * noiseDur), ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var n = 0; n < data.length; n++) {
+      data[n] = (Math.random() * 2 - 1) * (1 - n / data.length);
+    }
+    var noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    var ng = ctx.createGain();
+    ng.gain.value = 0.22;
+    noise.connect(ng);
+    ng.connect(env);
+    noise.start(t);
+
+    // 轻微回响：延迟 60ms + 32% 反馈（feedback 增益 < 1 保证不啸叫）
+    var delay = ctx.createDelay(0.6);
+    delay.delayTime.value = 0.06;
+    var fb = ctx.createGain();
+    fb.gain.value = 0.32;
+    var wet = ctx.createGain();
+    wet.gain.value = 0.28;
+    env.connect(delay);
+    delay.connect(fb);
+    fb.connect(delay);
+    delay.connect(wet);
+    wet.connect(master);
+    env.connect(master);
+  }
+
+  /* ============================================================
+     历史记录：最近 10 条，localStorage 持久化
+     ============================================================ */
+  function loadHistory() {
+    var raw = safeGet(HISTORY_KEY);
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.slice(0, HISTORY_LIMIT) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function addHistory(face, text) {
+    var list = loadHistory();
+    list.unshift({ face: face, text: text, t: Date.now() });
+    list = list.slice(0, HISTORY_LIMIT);
+    safeSet(HISTORY_KEY, JSON.stringify(list));
+    renderHistory(list);
+    recordStats(face);
+  }
+
+  function renderHistory(list) {
+    historyList.innerHTML = '';
+    if (!list.length) {
+      var empty = document.createElement('li');
+      empty.className = 'history-empty';
+      empty.textContent = '还没有记录，抛一次试试～';
+      historyList.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var li = document.createElement('li');
+      li.className = 'history-item';
+
+      var badge = document.createElement('span');
+      badge.className = 'badge ' + (it.face === 'front' ? 'badge-front' : 'badge-back');
+      badge.textContent = it.face === 'front' ? '正' : '反';
+
+      var txt = document.createElement('span');
+      txt.className = 'htext';
+      txt.textContent = it.text; // textContent 防止注入
+
+      var time = document.createElement('span');
+      time.className = 'htime';
+      time.textContent = formatTime(it.t);
+
+      li.appendChild(badge);
+      li.appendChild(txt);
+      li.appendChild(time);
+      historyList.appendChild(li);
+    }
+  }
+
+  function formatTime(ts) {
+    var d = new Date(ts);
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  /* ============================================================
+     正反统计：独立计数（不受“最近 10 条”限制），
+     展示长期比例，帮助用户观察结果趋近 50%
+     ============================================================ */
+  function loadStats() {
+    var raw = safeGet(STATS_KEY);
+    if (raw) {
+      try {
+        var s = JSON.parse(raw);
+        if (s && typeof s.total === 'number' && typeof s.front === 'number' && typeof s.back === 'number') {
+          return s;
+        }
+      } catch (e) {}
+    }
+    // 首次使用（无统计记录）时从现有历史重建近似数据
+    var list = loadHistory();
+    var front = 0, back = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].face === 'front') front++; else back++;
+    }
+    return { total: front + back, front: front, back: back };
+  }
+
+  function recordStats(face) {
+    var s = loadStats();
+    s.total++;
+    if (face === 'front') s.front++; else s.back++;
+    safeSet(STATS_KEY, JSON.stringify(s));
+    renderStats(s);
+  }
+
+  function renderStats(s) {
+    statsBox.innerHTML = '';
+    if (!s.total) {
+      var empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = '暂无统计，抛一次看看吧～';
+      statsBox.appendChild(empty);
+      return;
+    }
+    var frontPct = Math.round(s.front / s.total * 100);
+    var backPct = 100 - frontPct;
+
+    var line = document.createElement('div');
+    line.className = 'stats-line';
+    var f = document.createElement('span');
+    f.className = 'cnt cnt-front';
+    f.textContent = '正 ' + s.front + ' 次';
+    var t = document.createElement('span');
+    t.className = 'cnt';
+    t.textContent = '共 ' + s.total + ' 次 · 正 ' + frontPct + '%';
+    var b = document.createElement('span');
+    b.className = 'cnt cnt-back';
+    b.textContent = '反 ' + s.back + ' 次';
+    line.appendChild(f);
+    line.appendChild(t);
+    line.appendChild(b);
+
+    var bar = document.createElement('div');
+    bar.className = 'stats-bar';
+    var fBar = document.createElement('div');
+    fBar.className = 'stats-fill fill-front';
+    fBar.style.width = frontPct + '%';
+    var bBar = document.createElement('div');
+    bBar.className = 'stats-fill fill-back';
+    bBar.style.width = backPct + '%';
+    bar.appendChild(fBar);
+    bar.appendChild(bBar);
+
+    statsBox.appendChild(line);
+    statsBox.appendChild(bar);
+  }
+
+  /* ============================================================
+     事件绑定
+     ============================================================ */
+  function bindEvents() {
+    // 首次用户交互即解锁音频（移动端/微信要求在手势回调中创建并 resume）
+    var unlock = function () { ensureAudioCtx(); };
+    document.addEventListener('pointerdown', unlock, { passive: true });
+    document.addEventListener('touchstart', unlock, { passive: true });
+    document.addEventListener('click', unlock);
+
+    flipBtn.addEventListener('click', startFlip);
+    coinScene.addEventListener('click', startFlip);
+
+    frontInput.addEventListener('input', function () {
+      frontText = frontInput.value.trim() || DEFAULTS.front;
+      applyTexts();
+      saveTexts();
+    });
+    backInput.addEventListener('input', function () {
+      backText = backInput.value.trim() || DEFAULTS.back;
+      applyTexts();
+      saveTexts();
+    });
+    restoreBtn.addEventListener('click', restoreDefaults);
+  }
+})();
+</script>
+</body>
+</html>
